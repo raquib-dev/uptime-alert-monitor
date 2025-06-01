@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Uptime Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta http-equiv="refresh" content="60" />
+</head>
+<body class="bg-gray-900 text-white font-sans p-6">
+
+  <!-- Header + Add Button -->
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-3xl font-bold">📊 Uptime Monitor Dashboard</h1>
+    <button onclick="openModal()" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm">
+      ➕ Add Target
+    </button>
+  </div>
+
+  <!-- Target Table -->
+  <table class="table-auto w-full border-collapse border border-gray-700 text-sm">
+    <thead class="bg-gray-800 text-gray-300">
+      <tr>
+        <th class="px-4 py-2 border border-gray-700 text-left">Name</th>
+        <th class="px-4 py-2 border border-gray-700 text-left">URL</th>
+        <th class="px-4 py-2 border border-gray-700 text-left">Status</th>
+        <th class="px-4 py-2 border border-gray-700 text-left">Response Time</th>
+        <th class="px-4 py-2 border border-gray-700 text-left">Last Checked</th>
+        <th class="px-4 py-2 border border-gray-700 text-left">Uptime</th>
+        <th class="px-4 py-2 border border-gray-700 text-left">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for target in targets %}
+      <tr class="hover:bg-gray-800" id="target-{{ target.id }}">
+        <td class="px-4 py-2 border border-gray-700">{{ target.name }}</td>
+        <td class="px-4 py-2 border border-gray-700">{{ target.url }}</td>
+        <td class="px-4 py-2 border border-gray-700">
+          {% if target.last_status %}
+            <span class="bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded-full">UP</span>
+          {% else %}
+            <span class="bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">DOWN</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-2 border border-gray-700">
+          {{ target.last_response_time if target.last_response_time else "-" }} s
+        </td>
+        <td class="px-4 py-2 border border-gray-700">
+          {{ target.last_checked.strftime('%Y-%m-%d %H:%M:%S') if target.last_checked else "-" }}
+        </td>
+        <td class="px-4 py-2 border border-gray-700">
+          {{ uptime_map.get(target.id, '-') }}
+        </td>
+        <td class="px-4 py-2 border border-gray-700 flex space-x-2">
+          <a href="/target/{{ target.id }}/history" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1 rounded">📈 View</a>
+          <button onclick="deleteTarget({{ target.id }})" class="text-red-400 hover:text-red-600 text-lg">🗑️</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Add Target Modal -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center">
+    <div class="bg-white rounded-lg p-6 w-96 text-black">
+      <h2 class="text-xl font-semibold mb-4">➕ Add New Target</h2>
+      <form id="addForm" class="space-y-3" onsubmit="submitTarget(event)">
+        <input type="text" name="name" placeholder="Name" class="w-full p-2 border rounded" required />
+        <input type="url" name="url" placeholder="https://example.com" class="w-full p-2 border rounded" required />
+        <input type="number" name="retry_count" placeholder="Retry Count (default 3)" class="w-full p-2 border rounded" />
+        <input type="number" name="cooldown" placeholder="Cooldown Seconds (default 10)" class="w-full p-2 border rounded" />
+        <div class="flex justify-end space-x-2 mt-4">
+          <button type="button" onclick="closeModal()" class="px-4 py-1 bg-gray-300 rounded">Cancel</button>
+          <button type="submit" class="px-4 py-1 bg-green-600 text-white rounded">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    function openModal() {
+      document.getElementById("modal").classList.remove("hidden");
+      document.getElementById("modal").classList.add("flex");
+    }
+
+    function closeModal() {
+      document.getElementById("modal").classList.remove("flex");
+      document.getElementById("modal").classList.add("hidden");
+      document.getElementById("addForm").reset();
+    }
+
+    async function submitTarget(e) {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+
+      // Extract and sanitize the URL (get only the hostname)
+      // const rawUrl = formData.get("url");
+      // try {
+      //   const hostname = new URL(rawUrl).hostname;
+      //   formData.set("url", hostname);
+      // } catch (err) {
+      //   alert("Invalid URL format.");
+      //   return;
+      // }
+
+      // Only include non-empty fields
+      const filteredParams = new URLSearchParams();
+      for (const [key, value] of formData.entries()) {
+        if (value.trim() !== "") {
+          filteredParams.append(key, value);
+        }
+      }
+
+      try {
+        const res = await fetch(`/api/targets?${filteredParams.toString()}`, {
+          method: 'POST'
+        });
+
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert("Failed to add target.");
+        }
+      } catch (err) {
+        alert("Network error.");
+      }
+    }
+
+    async function deleteTarget(id) {
+      if (!confirm("Delete this target?")) return;
+
+      try {
+        const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          document.getElementById(`target-${id}`).remove();
+        } else {
+          alert("Failed to delete.");
+        }
+      } catch (err) {
+        alert("Network error.");
+      }
+    }
+  </script>
+</body>
+</html>

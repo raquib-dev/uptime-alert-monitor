@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title>Response Time Chart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans p-6">
+  <h1 class="text-2xl font-bold mb-6 text-center">📈 Response Time Trend</h1>
+
+  <div class="max-w-4xl mx-auto space-y-2 mb-6 text-sm">
+    <p><strong>Target:</strong> {{ history[0].target.name if history else 'N/A' }}</p>
+    <p><strong>URL:</strong> {{ history[0].target.url if history else 'N/A' }}</p>
+    <p><strong>Last Checked:</strong> {{ history[-1].checked_at.strftime('%Y-%m-%d %H:%M:%S') if history else 'N/A' }}</p>
+
+    {% if history %}
+      {% set times = history | map(attribute='response_time') | list %}
+      <p><strong>Min:</strong> {{ "%.2f" % (times | min) }}s</p>
+      <p><strong>Max:</strong> {{ "%.2f" % (times | max) }}s</p>
+      <p><strong>Avg:</strong> {{ "%.2f" % (times | sum / times | length) }}s</p>
+    {% else %}
+      <p>No ping data found.</p>
+    {% endif %}
+  </div>
+
+  <form method="get" class="max-w-4xl mx-auto mb-6 flex flex-wrap gap-3 items-center">
+    <label for="range" class="font-medium">View Range:</label>
+    <select name="range" id="range" onchange="this.form.submit()" class="text-black p-1 rounded">
+      <option value="all" {% if selected_range == 'all' %}selected{% endif %}>All Time</option>
+      <option value="1h" {% if selected_range == '1h' %}selected{% endif %}>Last 1 Hour</option>
+      <option value="24h" {% if selected_range == '24h' %}selected{% endif %}>Last 24 Hours</option>
+      <option value="7d" {% if selected_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+    </select>
+    <label for="interval" class="mr-2 font-medium">Interval:</label>
+    <select name="interval" id="interval" onchange="this.form.submit()" class="text-black p-1 rounded">
+      <option value="1" {% if selected_interval == '1' %}selected{% endif %}>Every Record</option>
+      <option value="2" {% if selected_interval == '2' %}selected{% endif %}>Every 2nd</option>
+      <option value="5" {% if selected_interval == '5' %}selected{% endif %}>Every 5th</option>
+      <option value="10" {% if selected_interval == '10' %}selected{% endif %}>Every 10th</option>
+    </select>
+
+    <div class="relative inline-block text-left ml-4">
+      <button type="button" onclick="toggleDropdown()" class="inline-flex justify-center w-full rounded-md border border-gray-700 shadow-sm px-4 py-2 bg-gray-800 text-sm font-medium text-white hover:bg-gray-700">
+        Toggle Series
+        <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div id="dropdownOptions" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+        <div class="py-1 text-sm text-white">
+          <label class="flex items-center px-4 py-2 hover:bg-gray-700">
+            <input type="checkbox" id="showSuccess" checked onchange="renderChart()" class="mr-2"> ✅ Show Success
+          </label>
+          <label class="flex items-center px-4 py-2 hover:bg-gray-700">
+            <input type="checkbox" id="showFailure" checked onchange="renderChart()" class="mr-2"> ❌ Show Failure
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <button title="Reset Zoom" type="button" onclick="chart.resetZoom()" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded">
+      🔄 Reset Zoom
+    </button>
+
+    <button title="Export CSV" type="button" onclick="downloadCSV()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded">
+      📁 Export
+    </button>
+
+  </form>
+
+  <canvas id="chart" class="w-full max-w-4xl mx-auto mb-10 h-96"></canvas>
+
+  <script>
+    const rawData = {
+      success: [
+        {% for h in history if h.status %}
+          { x: "{{ h.checked_at.isoformat() }}", y: {{ h.response_time or 0 }} },
+        {% endfor %}
+      ],
+      failure: [
+        {% for h in history if not h.status %}
+          { x: "{{ h.checked_at.isoformat() }}", y: {{ h.response_time or 0 }} },
+        {% endfor %}
+      ]
+    };
+
+    let chart;
+
+    function renderChart() {
+      const showSuccess = document.getElementById("showSuccess").checked;
+      const showFailure = document.getElementById("showFailure").checked;
+
+      const datasets = [];
+      if (showSuccess) {
+        datasets.push({
+          label: '✅ Success',
+          data: rawData.success,
+          borderColor: 'rgb(0, 200, 100)',
+          backgroundColor: 'rgba(0, 200, 100, 0.3)',
+          tension: 0.3,
+          fill: true
+        });
+      }
+
+      if (showFailure) {
+        datasets.push({
+          label: '❌ Failure',
+          data: rawData.failure,
+          borderColor: 'rgb(255, 80, 80)',
+          backgroundColor: 'rgba(255, 80, 80, 0.3)',
+          tension: 0.3,
+          fill: true
+        });
+      }
+
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('chart'), {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'PPpp', unit: 'minute' },
+              title: { display: true, text: 'Checked At' },
+              ticks: { color: '#ccc' }
+            },
+            y: {
+              title: { display: true, text: 'Response Time (s)' },
+              ticks: { color: '#ccc' }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  return `⏱️ ${ctx.parsed.y}s at ${new Date(ctx.parsed.x).toLocaleString()}`;
+                }
+              }
+            },
+            legend: { labels: { color: '#fff' } },
+            zoom: {
+              pan: { enabled: true, mode: 'x' },
+              zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                mode: 'x'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function downloadCSV() {
+      const rows = [['Checked At', 'Response Time (s)', 'Status']];
+      {% for h in history %}
+        rows.push(['{{ h.checked_at.strftime('%Y-%m-%d %H:%M:%S') }}', '{{ h.response_time }}', '{{ 'UP' if h.status else 'DOWN' }}']);
+      {% endfor %}
+      const csv = "data:text/csv;charset=utf-8," + rows.map(r => r.join(',')).join('\n');
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csv));
+      link.setAttribute("download", "ping_history.csv");
+      document.body.appendChild(link);
+      link.click();
+    }
+
+    window.onload = renderChart;
+
+    function toggleDropdown() {
+      const dropdown = document.getElementById("dropdownOptions");
+      dropdown.classList.toggle("hidden");
+    }
+
+    // Optional: close dropdown on outside click
+    document.addEventListener("click", function (e) {
+      const dropdown = document.getElementById("dropdownOptions");
+      const button = e.target.closest("button");
+      if (!button || !button.closest(".relative")) {
+        dropdown.classList.add("hidden");
+      }
+    });
+  </script>
+</body>
+</html>
