@@ -1,4 +1,3 @@
- 
 import os
 from sqlalchemy import func, Integer
 from app.logger import logger

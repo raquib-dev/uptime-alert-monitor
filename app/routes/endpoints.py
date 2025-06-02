@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
 from app.models import Target
+from app.monitor import monitor_all_targets
 
 router = APIRouter(prefix="/api", tags=["Targets"])
 
@@ -17,6 +18,7 @@ async def add_target(name: str, url: str, retry_count: int = 3, cooldown: int = 
     db.add(target)
     await db.commit()
     await db.refresh(target)
+    await monitor_all_targets()
     return target
 
 @router.delete("/targets/{target_id}")
