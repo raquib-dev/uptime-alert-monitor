@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi import APIRouter, Depends, HTTPException, Form, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
@@ -15,12 +15,21 @@ async def get_targets(db: AsyncSession = Depends(get_db), user: User = Depends(g
     return result.scalars().all()
 
 @router.post("/targets")
-async def add_target(name: str, url: str, retry_count: int = 3, cooldown: int = 10, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def add_target(
+    background_tasks: BackgroundTasks,
+    name: str,
+    url: str,
+    retry_count: int = 3,
+    cooldown: int = 10,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
     target = Target(name=name, url=url, retry_count=retry_count, cooldown=cooldown)
     db.add(target)
     await db.commit()
     await db.refresh(target)
-    await monitor_all_targets()
+
+    background_tasks.add_task(monitor_all_targets)
     return target
 
 @router.put("/targets/{target_id}")
