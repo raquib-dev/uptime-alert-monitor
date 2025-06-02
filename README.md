@@ -121,10 +121,6 @@ All routes are protected via **JWT token authentication**.
 
 Pull requests are welcome. Please open issues first to discuss what you would like to change.
 
-## 📄 License
-
-[MIT](LICENSE)
-
 ---
 
 Built with ❤️ by Mohammed Raquib 🚀
