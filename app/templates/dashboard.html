@@ -9,6 +9,10 @@
 </head>
 <body class="bg-gray-900 text-white font-sans p-6">
 
+  <div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-md hidden z-50">
+    <span id="toast-message">Success</span>
+  </div>
+
   <!-- Header + Add Button -->
   <div class="flex justify-between items-center mb-8">
     <h1 class="text-3xl font-bold">📊 Uptime Monitor Dashboard</h1>
@@ -53,6 +57,7 @@
         </td>
         <td class="px-4 py-2 border border-gray-700 flex space-x-2">
           <a href="/target/{{ target.id }}/history" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1 rounded">📈 View</a>
+          <button onclick="openEditModal({{ target.id }}, '{{ target.name }}', '{{ target.url }}', {{ target.retry_count }}, {{ target.cooldown }})" class="text-yellow-400 hover:text-yellow-500 text-lg">✏️</button>
           <button onclick="deleteTarget({{ target.id }})" class="text-red-400 hover:text-red-600 text-lg">🗑️</button>
         </td>
       </tr>
@@ -77,6 +82,24 @@
     </div>
   </div>
 
+  <!-- Edit Target Modal -->
+  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center">
+    <div class="bg-white rounded-lg p-6 w-96 text-black">
+      <h2 class="text-xl font-semibold mb-4">✏️ Edit Target</h2>
+      <form id="editForm" class="space-y-3" onsubmit="submitEditTarget(event)">
+        <input type="hidden" name="id" id="edit-id" />
+        <input type="text" name="name" id="edit-name" placeholder="Name" class="w-full p-2 border rounded" required />
+        <input type="url" name="url" id="edit-url" placeholder="https://example.com" class="w-full p-2 border rounded" required />
+        <input type="number" name="retry_count" id="edit-retry" placeholder="Retry Count" class="w-full p-2 border rounded" />
+        <input type="number" name="cooldown" id="edit-cooldown" placeholder="Cooldown Seconds" class="w-full p-2 border rounded" />
+        <div class="flex justify-end space-x-2 mt-4">
+          <button type="button" onclick="closeEditModal()" class="px-4 py-1 bg-gray-300 rounded">Cancel</button>
+          <button type="submit" class="px-4 py-1 bg-blue-600 text-white rounded">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script>
     function openModal() {
@@ -95,16 +118,6 @@
       const form = e.target;
       const formData = new FormData(form);
 
-      // Extract and sanitize the URL (get only the hostname)
-      // const rawUrl = formData.get("url");
-      // try {
-      //   const hostname = new URL(rawUrl).hostname;
-      //   formData.set("url", hostname);
-      // } catch (err) {
-      //   alert("Invalid URL format.");
-      //   return;
-      // }
-
       // Only include non-empty fields
       const filteredParams = new URLSearchParams();
       for (const [key, value] of formData.entries()) {
@@ -119,9 +132,10 @@
         });
 
         if (res.ok) {
-          location.reload();
+          showToast("✅ Target added successfully");
+          setTimeout(() => location.reload(), 1000);
         } else {
-          alert("Failed to add target.");
+          showToast("❌ Failed to add target", true);
         }
       } catch (err) {
         alert("Network error.");
@@ -134,14 +148,78 @@
       try {
         const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' });
         if (res.ok) {
+          showToast("✅ Target deleted successfully");
           document.getElementById(`target-${id}`).remove();
         } else {
-          alert("Failed to delete.");
+          showToast("❌ Failed to delete target", true);
         }
       } catch (err) {
         alert("Network error.");
       }
     }
+    
+    function openEditModal(id, name, url, retry, cooldown) {
+      document.getElementById("edit-id").value = id;
+      document.getElementById("edit-name").value = name;
+      document.getElementById("edit-url").value = url;
+      document.getElementById("edit-retry").value = retry;
+      document.getElementById("edit-cooldown").value = cooldown;
+
+      document.getElementById("editModal").classList.remove("hidden");
+      document.getElementById("editModal").classList.add("flex");
+    }
+
+    function closeEditModal() {
+      document.getElementById("editModal").classList.remove("flex");
+      document.getElementById("editModal").classList.add("hidden");
+      document.getElementById("editForm").reset();
+    }
+
+    async function submitEditTarget(e) {
+      e.preventDefault();
+      const form = e.target;
+      const id = document.getElementById("edit-id").value;
+
+      const data = new URLSearchParams();
+      for (const [key, value] of new FormData(form).entries()) {
+        if (key !== "id" && value.trim() !== "") {
+          data.append(key, value);
+        }
+      }
+
+      try {
+        const res = await fetch(`/api/targets/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: data
+        });
+
+        if (res.ok) {
+          showToast("✅ Target updated successfully");
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showToast("❌ Failed to update target", true);
+        }
+      } catch (err) {
+        alert("Network error.");
+      }
+    }
+    
+    function showToast(message, isError = false) {
+      const toast = document.getElementById("toast");
+      const messageBox = document.getElementById("toast-message");
+      
+      toast.classList.remove("bg-green-600", "bg-red-600");
+      toast.classList.add(isError ? "bg-red-600" : "bg-green-600");
+      
+      messageBox.textContent = message;
+      toast.classList.remove("hidden");
+
+      setTimeout(() => {
+        toast.classList.add("hidden");
+      }, 3000);
+    }
+
   </script>
 </body>
 </html>
