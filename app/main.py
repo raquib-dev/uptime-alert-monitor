@@ -43,9 +43,9 @@ async def startup_event():
     await create_default_admin()
     await start_scheduler()
 
-@app.get("/")
-def root():
-    return {"status": "Uptime Monitor API is running 🚀"}
+@app.get("/", response_class=HTMLResponse)
+def root(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):

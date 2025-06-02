@@ -22,6 +22,24 @@
   </form>
 
   <script>
+    async function checkTokenValidity() {
+      const token = localStorage.getItem("access_token");
+      try {
+        const res = await fetch("/api/token/validate", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          window.location.href = "/dashboard";
+        }
+      } catch (err) {
+        alert("Network error. Unable to validate session.");
+      }
+    }
+
+    // Call it on page load
+    checkTokenValidity();
+    
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const form = new FormData(e.target);
