@@ -2,8 +2,9 @@ import os
 from sqlalchemy import func, Integer
 from app.logger import logger
 from app.routes import endpoints
-from app.models import Base, Target, PingHistory
-from fastapi import FastAPI, Request
+from app.routes import auth
+from app.models import Base, Target, PingHistory, User
+from fastapi import FastAPI, Request, Depends
 from sqlalchemy.future import select
 from app.scheduler import start_scheduler
 from fastapi.responses import HTMLResponse
@@ -12,6 +13,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta
+from app.utils.deps import get_current_user
+from app.startup import create_default_admin
 
 
 app = FastAPI(title="Uptime Alert Monitor")
@@ -30,17 +33,23 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(endpoints.router)
+app.include_router(auth.router)
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting Uptime Monitor...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await create_default_admin()
     await start_scheduler()
 
 @app.get("/")
 def root():
     return {"status": "Uptime Monitor API is running 🚀"}
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):

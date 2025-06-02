@@ -102,6 +102,28 @@
 
   <!-- Scripts -->
   <script>
+    async function checkTokenValidity() {
+      const token = localStorage.getItem("access_token");
+      if (!token) return window.location.href = "/login";
+
+      try {
+        const res = await fetch("/api/token/validate", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+          // Token is expired or invalid
+          localStorage.removeItem("access_token");
+          window.location.href = "/login";
+        }
+      } catch (err) {
+        alert("Network error. Unable to validate session.");
+      }
+    }
+
+    // Call it on page load
+    checkTokenValidity();
+
     function openModal() {
       document.getElementById("modal").classList.remove("hidden");
       document.getElementById("modal").classList.add("flex");
@@ -118,7 +140,6 @@
       const form = e.target;
       const formData = new FormData(form);
 
-      // Only include non-empty fields
       const filteredParams = new URLSearchParams();
       for (const [key, value] of formData.entries()) {
         if (value.trim() !== "") {
@@ -127,13 +148,20 @@
       }
 
       try {
+        const token = localStorage.getItem("access_token");
         const res = await fetch(`/api/targets?${filteredParams.toString()}`, {
-          method: 'POST'
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
 
         if (res.ok) {
           showToast("✅ Target added successfully");
           setTimeout(() => location.reload(), 1000);
+        } else if (res.status === 401) {
+          showToast("🔒 Session expired. Redirecting to login...", true);
+          setTimeout(() => window.location.href = "/login", 1500);
         } else {
           showToast("❌ Failed to add target", true);
         }
@@ -146,10 +174,20 @@
       if (!confirm("Delete this target?")) return;
 
       try {
-        const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' });
+        const token = localStorage.getItem("access_token");
+        const res = await fetch(`/api/targets/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
         if (res.ok) {
           showToast("✅ Target deleted successfully");
           document.getElementById(`target-${id}`).remove();
+        } else if (res.status === 401) {
+          showToast("🔒 Session expired. Redirecting to login...", true);
+          setTimeout(() => window.location.href = "/login", 1500);
         } else {
           showToast("❌ Failed to delete target", true);
         }
@@ -157,7 +195,7 @@
         alert("Network error.");
       }
     }
-    
+
     function openEditModal(id, name, url, retry, cooldown) {
       document.getElementById("edit-id").value = id;
       document.getElementById("edit-name").value = name;
@@ -188,15 +226,22 @@
       }
 
       try {
+        const token = localStorage.getItem("access_token");
         const res = await fetch(`/api/targets/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
           body: data
         });
 
         if (res.ok) {
           showToast("✅ Target updated successfully");
           setTimeout(() => location.reload(), 1000);
+        } else if (res.status === 401) {
+          showToast("🔒 Session expired. Redirecting to login...", true);
+          setTimeout(() => window.location.href = "/login", 1500);
         } else {
           showToast("❌ Failed to update target", true);
         }
@@ -204,14 +249,14 @@
         alert("Network error.");
       }
     }
-    
+
     function showToast(message, isError = false) {
       const toast = document.getElementById("toast");
       const messageBox = document.getElementById("toast-message");
-      
+
       toast.classList.remove("bg-green-600", "bg-red-600");
       toast.classList.add(isError ? "bg-red-600" : "bg-green-600");
-      
+
       messageBox.textContent = message;
       toast.classList.remove("hidden");
 
@@ -219,7 +264,7 @@
         toast.classList.add("hidden");
       }, 3000);
     }
-
   </script>
+
 </body>
 </html>

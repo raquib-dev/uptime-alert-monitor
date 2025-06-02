@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans flex items-center justify-center min-h-screen">
+  <form id="loginForm" class="bg-gray-800 p-8 rounded shadow-md w-full max-w-sm">
+    <h2 class="text-xl font-bold mb-6 text-center">🔐 Login</h2>
+
+    <input type="text" name="username" placeholder="Username" required
+           class="w-full p-2 mb-4 rounded bg-gray-700 border border-gray-600" />
+    <input type="password" name="password" placeholder="Password" required
+           class="w-full p-2 mb-4 rounded bg-gray-700 border border-gray-600" />
+
+    <button type="submit"
+            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded">
+      Login
+    </button>
+    <p id="error" class="text-red-400 mt-4 text-sm text-center hidden">Invalid credentials</p>
+  </form>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const params = new URLSearchParams(form);
+
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("access_token", data.access_token);
+        window.location.href = "/dashboard";
+      } else {
+        document.getElementById("error").classList.remove("hidden");
+      }
+    });
+  </script>
+</body>
+</html>

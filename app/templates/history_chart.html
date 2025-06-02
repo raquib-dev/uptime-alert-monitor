@@ -82,6 +82,28 @@
   <canvas id="chart" class="w-full max-w-4xl mx-auto mb-10 h-96"></canvas>
 
   <script>
+    async function checkTokenValidity() {
+      const token = localStorage.getItem("access_token");
+      if (!token) return window.location.href = "/login";
+
+      try {
+        const res = await fetch("/api/token/validate", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+          // Token is expired or invalid
+          localStorage.removeItem("access_token");
+          window.location.href = "/login";
+        }
+      } catch (err) {
+        alert("Network error. Unable to validate session.");
+      }
+    }
+
+    // Call it on page load
+    checkTokenValidity();
+
     const rawData = {
       success: [
         {% for h in history if h.status %}

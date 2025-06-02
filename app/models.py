@@ -21,7 +21,6 @@ class Target(Base):
 
     history = relationship("PingHistory", back_populates="target", cascade="all, delete")
 
-
 class PingHistory(Base):
     __tablename__ = "ping_history"
 
@@ -32,3 +31,12 @@ class PingHistory(Base):
     checked_at = Column(DateTime(timezone=False), server_default=text("CURRENT_TIMESTAMP"))
 
     target = relationship("Target", back_populates="history")
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
